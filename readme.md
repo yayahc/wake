@@ -1,6 +1,12 @@
+### Wake
 A little mobile application that extend base alarm feature with hard to skip alarm capa
-``` run
-start running the current alarm
-show skip problem to solve
-while problem !is solved then continue running
-```
+
+##### How it work?
+1- start running the current alarm  
+2- show skip problem to solve  
+3- while problem !is solved then continue running
+
+###### TODO
+- [ ] simple alarm
+- [ ] background capability
+- [ ] skip prevention
