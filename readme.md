@@ -1,5 +1,5 @@
 ### Wake
-A little mobile application that extend base alarm feature with hard to skip alarm capa
+A little mobile application that extend base alarm feature with hard to skip alarm capability
 
 ##### How it work?
 1- start running the current alarm  
