@@ -4,8 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wake/core/domain/entities/alarm_entity.dart';
 import 'package:wake/core/extensions/context_extension.dart';
 
-import '../state/cubit/alarm_cubit.dart';
-import '../state/cubit/alarm_state.dart';
+import '../cubit/alarm_cubit.dart';
+import '../cubit/alarm_state.dart';
 
 class SetAlarmSheet extends StatefulWidget {
   const SetAlarmSheet({super.key});
@@ -45,6 +45,11 @@ class _SetAlarmSheetState extends State<SetAlarmSheet> {
             child: Column(
               children: [
                 TextField(controller: _messageController),
+                SizedBox(height: 8),
+                CupertinoDatePicker(
+                  onDateTimeChanged: (dateTime) =>
+                      _ringAtNotifier.value = dateTime,
+                ),
                 SizedBox(height: 8),
                 ListenableBuilder(
                   listenable: _isSettingAlarm,

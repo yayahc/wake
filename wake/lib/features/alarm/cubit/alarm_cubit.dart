@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wake/core/domain/entities/alarm_entity.dart';
 import 'package:wake/core/domain/usecases/alarm_usecases.dart';
-import 'package:wake/features/alarm/state/cubit/alarm_state.dart';
+import 'package:wake/features/alarm/cubit/alarm_state.dart';
 
 class AlarmCubit extends Cubit<AlarmState> {
   static late final AlarmCubit _instance;

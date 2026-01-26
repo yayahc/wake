@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wake/core/extensions/context_extension.dart';
-import 'package:wake/features/alarm/state/cubit/alarm_state.dart';
+import 'package:wake/features/alarm/cubit/alarm_state.dart';
 import 'package:wake/features/alarm/widgets/set_alarm_sheet.dart';
 
-import '../state/cubit/alarm_cubit.dart';
+import '../cubit/alarm_cubit.dart';
 
 class AlarmMainScreen extends StatelessWidget {
   const AlarmMainScreen({super.key});
