@@ -7,6 +7,6 @@ A little mobile application that extend base alarm feature with hard to skip ala
 3- while problem !is solved then continue running
 
 ###### TODO
-- [ ] simple alarm
+- [ ] simple alarm using [AlarmManager](https://developer.android.com/reference/kotlin/android/app/AlarmManager)
 - [ ] background capability
 - [ ] skip prevention
