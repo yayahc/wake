@@ -44,3 +44,17 @@ class FailedToSetAlarmState extends AlarmState {
   @override
   List<Object?> get props => [error];
 }
+
+class AlarmDeletedState extends AlarmState {
+  @override
+  List<Object?> get props => [];
+}
+
+class FailedToDeleteAlarmState extends AlarmState {
+  final AppError error;
+
+  FailedToDeleteAlarmState({required this.error});
+
+  @override
+  List<Object?> get props => [error];
+}

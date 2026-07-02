@@ -4,29 +4,35 @@ import 'package:wake/core/domain/usecases/alarm_usecases.dart';
 import 'package:wake/features/alarm/cubit/alarm_state.dart';
 
 class AlarmCubit extends Cubit<AlarmState> {
-  static late final AlarmCubit _instance;
-  static AlarmCubit get instance => _instance;
-  AlarmCubit() : super(InitStateAlarmState()) {
-    _instance = AlarmCubit();
-  }
+  AlarmCubit() : super(InitStateAlarmState());
 
   List<AlarmEntity> alarms = [];
-
-  void setAlarm(AlarmEntity alarm) async {
-    emit(SettingAlarmState());
-    final result = await AlarmUsecases.setAlarm(alarm);
-    result.fold(
-      (error) => emit(FailedToSetAlarmState(error: error)),
-      (_) => emit(AlarmSuccesfulySetState()),
-    );
-  }
 
   void getAlarms() async {
     emit(LoadingAlarmsState());
     final result = await AlarmUsecases.getAlarms();
-    result.fold((error) => emit(FailedToLoadAlarmsState(error: error)), (as) {
+    result.fold((error) => emit(FailedToLoadAlarmsState(error: error)), (
+      loaded,
+    ) {
+      alarms = loaded;
       emit(AlarmsLoadedState());
-      alarms = as;
+    });
+  }
+
+  void setAlarm(AlarmEntity alarm) async {
+    emit(SettingAlarmState());
+    final result = await AlarmUsecases.setAlarm(alarm);
+    result.fold((error) => emit(FailedToSetAlarmState(error: error)), (_) {
+      emit(AlarmSuccesfulySetState());
+      getAlarms();
+    });
+  }
+
+  void deleteAlarm(int id) async {
+    final result = await AlarmUsecases.deleteAlarm(id);
+    result.fold((error) => emit(FailedToDeleteAlarmState(error: error)), (_) {
+      emit(AlarmDeletedState());
+      getAlarms();
     });
   }
 }
