@@ -8,5 +8,6 @@ A little mobile application that extend base alarm feature with hard to skip ala
 
 ###### TODO
 - [x] simple alarm using [AlarmManager](https://developer.android.com/reference/kotlin/android/app/AlarmManager)
+- [ ] ios support
 - [ ] background capability
 - [ ] skip prevention
