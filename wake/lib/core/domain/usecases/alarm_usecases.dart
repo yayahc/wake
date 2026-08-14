@@ -11,7 +11,7 @@ class AlarmUsecases {
     try {
       final db = AppDatabase.instance;
       final id = await db.into(db.alarm).insert(alarm.toCompanion);
-      await AlarmScheduler.schedule(id, alarm.ringAt);
+      await AlarmScheduler.schedule(id, alarm.ringAt, alarm.message);
       return right(id);
     } catch (e, s) {
       return left(
@@ -43,9 +43,28 @@ class AlarmUsecases {
     }
   }
 
+  static Future<Either<AppError, Unit>> resolveQuiz(int id) async {
+    try {
+      final db = AppDatabase.instance;
+      await AlarmScheduler.markQuizSolved(id);
+      await AlarmScheduler.cancel(id);
+      await (db.delete(db.alarm)..where((a) => a.id.equals(id))).go();
+      return right(unit);
+    } catch (e, s) {
+      return left(
+        GenericAppError(
+          errorMessage: e.toString(),
+          stackTrace: s.toString(),
+          userFriendlyErrorMessage: 'error stopping alarm try again',
+        ),
+      );
+    }
+  }
+
   static Future<Either<AppError, Unit>> deleteAlarm(int id) async {
     try {
       final db = AppDatabase.instance;
+      await AlarmScheduler.markQuizSolved(id);
       await AlarmScheduler.cancel(id);
       await (db.delete(db.alarm)..where((a) => a.id.equals(id))).go();
       return right(unit);
