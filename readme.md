@@ -8,6 +8,7 @@ A little mobile application that extend base alarm feature with hard to skip ala
 
 ###### TODO
 - [x] simple alarm using [AlarmManager](https://developer.android.com/reference/kotlin/android/app/AlarmManager)
-- [ ] ios support
-- [ ] background capability
+- [x] ios support using [AlarmKit](https://developer.apple.com/documentation/alarmkit) — see [wake/ios/AlarmKit.md](wake/ios/AlarmKit.md)
 - [ ] skip prevention
+  - [ ] android
+  - [x] iOS — (used re-alarm strategy to fire alarm again again until quiz solved ios dont allow hard block)
