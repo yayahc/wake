@@ -1,120 +1,150 @@
-import Foundation
 import AlarmKit
+import Foundation
 
-/// Files in this directory are shared between the Runner app and the
-/// WakeAlarmWidget extension. Both targets need them: the extension renders
-/// the alarm presentation, and the intents can be performed by either
-/// process. Keep them free of Flutter imports.
-
+/// Identifiers shared by the app and the widget extension.
+///
+/// `appGroup` must match the App Groups capability enabled on *both* the Runner
+/// and WakeAlarmWidget targets. If it does not, `WakeAlarmStore` falls back to a
+/// no-op and every alarm reads back as already solved, which silently disables
+/// the re-arm loop.
 enum WakeAlarmIdentity {
-  /// Must match the App Group enabled on both the Runner and the widget
-  /// extension targets.
-  static let appGroup = "group.dev.yayahc.wake"
-
-  /// Darwin notification used to reach the app process from whichever
-  /// process ends up performing the intent.
-  static let quizRequestedNotification = "dev.yayahc.wake.quizRequested"
-
-  /// Alarm rows are identified by an int in Drift but AlarmKit wants a UUID.
-  /// Deriving one from the row id keeps the mapping stateless in both
-  /// directions, so no lookup table has to stay in sync.
-  static func uuid(for alarmId: Int) -> UUID {
-    let hex = String(format: "%012llx", UInt64(max(0, alarmId)))
-    return UUID(uuidString: "00000000-0000-4000-8000-\(hex)")!
-  }
-
-  static func alarmId(for uuid: UUID) -> Int? {
-    let suffix = uuid.uuidString.split(separator: "-").last.map(String.init) ?? ""
-    guard let value = UInt64(suffix, radix: 16) else { return nil }
-    return Int(value)
-  }
+    static let appGroup = "group.dev.yayahc.wake"
+    static let methodChannel = "dev.yayahc.wake/alarm"
 }
 
-/// State that has to outlive the app process and be readable from the widget
-/// extension, so it lives in the shared App Group rather than in Drift.
-struct WakeAlarmStore {
-  static let shared = WakeAlarmStore()
-
-  private let defaults: UserDefaults?
-
-  private init() {
-    defaults = UserDefaults(suiteName: WakeAlarmIdentity.appGroup)
-    if defaults == nil {
-      NSLog("[Wake] App Group \(WakeAlarmIdentity.appGroup) is not configured")
-    }
-  }
-
-  private func quizKey(_ id: Int) -> String { "wake.quizPending.\(id)" }
-  private func messageKey(_ id: Int) -> String { "wake.message.\(id)" }
-  private let pendingQuizKey = "wake.pendingQuizAlarmId"
-
-  /// True while the user still owes a correct quiz answer for this alarm.
-  /// This is the flag the re-arm loop reads.
-  func isQuizPending(_ id: Int) -> Bool {
-    defaults?.bool(forKey: quizKey(id)) ?? false
-  }
-
-  func setQuizPending(_ pending: Bool, for id: Int) {
-    defaults?.set(pending, forKey: quizKey(id))
-  }
-
-  func message(for id: Int) -> String? {
-    defaults?.string(forKey: messageKey(id))
-  }
-
-  func setMessage(_ message: String, for id: Int) {
-    defaults?.set(message, forKey: messageKey(id))
-  }
-
-  /// Handoff slot for a cold start: the app was launched by the alert, so
-  /// Dart was not listening when the intent ran.
-  ///
-  /// Deliberately not consumed on read. It stays set until the quiz is
-  /// solved, so abandoning the app halfway still owes an answer next launch.
-  func setPendingQuiz(_ id: Int) {
-    defaults?.set(id, forKey: pendingQuizKey)
-  }
-
-  func pendingQuizAlarmId() -> Int? {
-    guard let defaults, defaults.object(forKey: pendingQuizKey) != nil else { return nil }
-    return defaults.integer(forKey: pendingQuizKey)
-  }
-
-  func clearPendingQuiz(ifMatching id: Int) {
-    guard pendingQuizAlarmId() == id else { return }
-    defaults?.removeObject(forKey: pendingQuizKey)
-  }
-
-  func forget(_ id: Int) {
-    defaults?.removeObject(forKey: quizKey(id))
-    defaults?.removeObject(forKey: messageKey(id))
-    clearPendingQuiz(ifMatching: id)
-  }
-}
-
-enum WakeAlarmBridge {
-  /// Posted cross-process because a LiveActivityIntent may be performed by
-  /// the widget extension rather than the app.
-  static func postQuizRequested() {
-    CFNotificationCenterPostNotification(
-      CFNotificationCenterGetDarwinNotifyCenter(),
-      CFNotificationName(WakeAlarmIdentity.quizRequestedNotification as CFString),
-      nil,
-      nil,
-      true
-    )
-  }
-}
-
-/// Payload carried alongside the alarm so the Live Activity can render the
-/// user's own message.
-@available(iOS 26.0, *)
+/// Metadata carried on the AlarmKit alert itself.
+///
+/// AlarmKit encodes this into the Live Activity attributes, so it is readable
+/// from the widget extension without touching the App Group.
 struct WakeAlarmMetadata: AlarmMetadata {
-  let alarmId: Int
-  let message: String
+    /// Drift row id of the alarm this alert belongs to.
+    let alarmId: Int
+    /// User-supplied wake message.
+    let message: String
 
-  init(alarmId: Int, message: String) {
-    self.alarmId = alarmId
-    self.message = message
-  }
+    init(alarmId: Int, message: String) {
+        self.alarmId = alarmId
+        self.message = message
+    }
+}
+
+/// One armed alarm as the re-arm loop sees it.
+///
+/// `id` is the AlarmKit alarm id and stays stable across re-arms, so a chain of
+/// retries is one record rather than a growing pile.
+struct WakeAlarmRecord: Codable, Hashable {
+    let id: UUID
+    let alarmId: Int
+    let message: String
+    /// When the alarm was originally meant to fire. Retries do not move this.
+    let originalRingAt: Date
+    /// When the currently armed alert fires.
+    var ringAt: Date
+    /// Set only by `WakeAlarmController.markQuizSolved`. The one exit from the loop.
+    var solved: Bool
+    /// How many times the alert has been dismissed without solving the quiz.
+    var retryCount: Int
+
+    init(
+        id: UUID = UUID(),
+        alarmId: Int,
+        message: String,
+        ringAt: Date,
+        solved: Bool = false,
+        retryCount: Int = 0
+    ) {
+        self.id = id
+        self.alarmId = alarmId
+        self.message = message
+        self.originalRingAt = ringAt
+        self.ringAt = ringAt
+        self.solved = solved
+        self.retryCount = retryCount
+    }
+}
+
+/// App Group backed store for the re-arm loop's state.
+///
+/// This deliberately does not live in Drift: the intent that runs on dismissal
+/// may be performed by the widget extension process while the Flutter app is not
+/// running, and that process cannot open the app's Drift database.
+struct WakeAlarmStore {
+    private static let recordsKey = "wake.alarm.records"
+
+    private static var defaults: UserDefaults? {
+        guard let suite = UserDefaults(suiteName: WakeAlarmIdentity.appGroup) else {
+            NSLog("[WakeAlarm] App Group \(WakeAlarmIdentity.appGroup) is not configured. "
+                + "Enable the App Groups capability on both Runner and WakeAlarmWidget.")
+            return nil
+        }
+        return suite
+    }
+
+    // MARK: - Reading
+
+    static func all() -> [WakeAlarmRecord] {
+        guard let data = defaults?.data(forKey: recordsKey) else { return [] }
+        do {
+            return try JSONDecoder().decode([WakeAlarmRecord].self, from: data)
+        } catch {
+            NSLog("[WakeAlarm] Could not decode stored records: \(error)")
+            return []
+        }
+    }
+
+    static func record(id: UUID) -> WakeAlarmRecord? {
+        all().first { $0.id == id }
+    }
+
+    static func record(alarmId: Int) -> WakeAlarmRecord? {
+        all().first { $0.alarmId == alarmId }
+    }
+
+    /// Every alarm that has fired at least once and still has an unsolved quiz.
+    static func unsolved() -> [WakeAlarmRecord] {
+        all().filter { !$0.solved }
+    }
+
+    // MARK: - Writing
+
+    static func upsert(_ record: WakeAlarmRecord) {
+        var records = all()
+        if let index = records.firstIndex(where: { $0.id == record.id }) {
+            records[index] = record
+        } else {
+            records.append(record)
+        }
+        persist(records)
+    }
+
+    static func remove(id: UUID) {
+        persist(all().filter { $0.id != id })
+    }
+
+    static func removeAll(alarmId: Int) {
+        persist(all().filter { $0.alarmId != alarmId })
+    }
+
+    /// Applies `mutation` to the stored record and writes it back.
+    /// Returns the mutated record, or nil if no such record exists.
+    @discardableResult
+    static func mutate(id: UUID, _ mutation: (inout WakeAlarmRecord) -> Void) -> WakeAlarmRecord? {
+        var records = all()
+        guard let index = records.firstIndex(where: { $0.id == id }) else {
+            NSLog("[WakeAlarm] No stored record for \(id.uuidString); nothing to mutate.")
+            return nil
+        }
+        mutation(&records[index])
+        persist(records)
+        return records[index]
+    }
+
+    private static func persist(_ records: [WakeAlarmRecord]) {
+        guard let defaults else { return }
+        do {
+            defaults.set(try JSONEncoder().encode(records), forKey: recordsKey)
+        } catch {
+            NSLog("[WakeAlarm] Could not encode records: \(error)")
+        }
+    }
 }

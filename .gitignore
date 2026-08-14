@@ -48,3 +48,5 @@ app.*.map.json
 .fvm/
 .vscode
 .fx
+# Backup written by wake/ios/setup_alarmkit_target.rb
+*.pbxproj.bak

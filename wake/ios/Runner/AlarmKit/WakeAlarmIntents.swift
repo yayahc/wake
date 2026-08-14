@@ -1,55 +1,59 @@
+import AlarmKit
 import AppIntents
 import Foundation
 
-/// Performed when the user taps Stop on the alarm alert.
+/// Runs when the alert's Stop button is tapped.
 ///
-/// The alarm stops regardless of what this does: iOS owns that button. All we
-/// can do is notice the quiz was never solved and arm the next one.
+/// AlarmKit has already stopped the alert by the time this performs; the only
+/// thing left to do is put it back. This may be performed by the widget
+/// extension process while the Flutter app is not running, which is why the loop
+/// state lives in the App Group rather than in Drift.
 @available(iOS 26.0, *)
-struct StopWakeAlarmIntent: LiveActivityIntent {
-  static let title: LocalizedStringResource = "Stop Wake alarm"
-  static let description = IntentDescription("Stops the current alarm.")
+struct WakeAlarmStopIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Stop alarm"
+    static var description = IntentDescription("Stops the current alert and re-arms it until the quiz is solved.")
+    static var isDiscoverable: Bool = false
 
-  @Parameter(title: "Alarm")
-  var alarmId: Int
+    @Parameter(title: "Alarm ID")
+    var alarmID: String
 
-  init() {}
+    init() {}
 
-  init(alarmId: Int) {
-    self.alarmId = alarmId
-  }
+    init(alarmID: String) {
+        self.alarmID = alarmID
+    }
 
-  func perform() async throws -> some IntentResult {
-    await WakeAlarmController.shared.handleDismissal(
-      alarmId: alarmId,
-      openingApp: false
-    )
-    return .result()
-  }
+    func perform() async throws -> some IntentResult {
+        guard let id = UUID(uuidString: alarmID) else { return .result() }
+        await WakeAlarmController.rearm(id: id)
+        return .result()
+    }
 }
 
-/// Performed when the user taps the secondary button, and opens the app on
-/// the quiz. This is the only path that can actually end the alarm chain.
+/// Runs when the alert's "Solve quiz" button is tapped.
+///
+/// Opens the app so the quiz gate can take over. It still re-arms: tapping
+/// "Solve quiz" and then force-quitting must not end the chain — only actually
+/// answering, via `WakeAlarmController.markQuizSolved`, does that.
 @available(iOS 26.0, *)
-struct OpenWakeQuizIntent: LiveActivityIntent {
-  static let title: LocalizedStringResource = "Solve Wake quiz"
-  static let description = IntentDescription("Opens Wake to answer the skip quiz.")
-  static let openAppWhenRun = true
+struct WakeAlarmSolveIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Solve wake quiz"
+    static var description = IntentDescription("Opens Wake so the quiz can be answered.")
+    static var openAppWhenRun: Bool = true
+    static var isDiscoverable: Bool = false
 
-  @Parameter(title: "Alarm")
-  var alarmId: Int
+    @Parameter(title: "Alarm ID")
+    var alarmID: String
 
-  init() {}
+    init() {}
 
-  init(alarmId: Int) {
-    self.alarmId = alarmId
-  }
+    init(alarmID: String) {
+        self.alarmID = alarmID
+    }
 
-  func perform() async throws -> some IntentResult {
-    await WakeAlarmController.shared.handleDismissal(
-      alarmId: alarmId,
-      openingApp: true
-    )
-    return .result()
-  }
+    func perform() async throws -> some IntentResult {
+        guard let id = UUID(uuidString: alarmID) else { return .result() }
+        await WakeAlarmController.rearm(id: id)
+        return .result()
+    }
 }

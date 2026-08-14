@@ -1,0 +1,7 @@
+// Base configuration for the WakeAlarmWidget extension.
+//
+// Deliberately does NOT include Debug.xcconfig / Release.xcconfig: those pull in
+// Pods-Runner, which would link Flutter.framework and every pod into the appex.
+// Generated.xcconfig alone supplies FLUTTER_BUILD_NAME / FLUTTER_BUILD_NUMBER so
+// the extension's version stays in lockstep with the app's.
+#include "Generated.xcconfig"
