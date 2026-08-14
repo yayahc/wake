@@ -58,9 +58,28 @@ class AlarmUsecases {
     }
   }
 
+  static Future<Either<AppError, Unit>> resolveQuiz(int id) async {
+    try {
+      final db = AppDatabase.instance;
+      await AlarmScheduler.markQuizSolved(id);
+      await AlarmScheduler.cancel(id);
+      await (db.delete(db.alarm)..where((a) => a.id.equals(id))).go();
+      return right(unit);
+    } catch (e, s) {
+      return left(
+        GenericAppError(
+          errorMessage: e.toString(),
+          stackTrace: s.toString(),
+          userFriendlyErrorMessage: 'error stopping alarm try again',
+        ),
+      );
+    }
+  }
+
   static Future<Either<AppError, Unit>> deleteAlarm(int id) async {
     try {
       final db = AppDatabase.instance;
+      await AlarmScheduler.markQuizSolved(id);
       await AlarmScheduler.cancel(id);
       await (db.delete(db.alarm)..where((a) => a.id.equals(id))).go();
       return right(unit);
