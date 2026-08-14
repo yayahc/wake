@@ -11,7 +11,7 @@ class AlarmUsecases {
     try {
       final db = AppDatabase.instance;
       final id = await db.into(db.alarm).insert(alarm.toCompanion);
-      await AlarmScheduler.schedule(id, alarm.ringAt);
+      await AlarmScheduler.schedule(id, alarm.ringAt, message: alarm.message);
       return right(id);
     } catch (e, s) {
       return left(
