@@ -11,7 +11,22 @@ class AlarmUsecases {
     try {
       final db = AppDatabase.instance;
       final id = await db.into(db.alarm).insert(alarm.toCompanion);
-      await AlarmScheduler.schedule(id, alarm.ringAt, alarm.message);
+      final armed = await AlarmScheduler.schedule(
+        id,
+        alarm.ringAt,
+        message: alarm.message,
+      );
+      if (!armed) {
+        await (db.delete(db.alarm)..where((a) => a.id.equals(id))).go();
+        return left(
+          GenericAppError(
+            errorMessage: 'platform refused to arm alarm $id',
+            stackTrace: StackTrace.current.toString(),
+            userFriendlyErrorMessage:
+                'could not set the alarm, check alarm permissions',
+          ),
+        );
+      }
       return right(id);
     } catch (e, s) {
       return left(

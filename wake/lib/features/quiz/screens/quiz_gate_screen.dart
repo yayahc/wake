@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:wake/core/domain/usecases/alarm_usecases.dart';
+import 'package:flutter/services.dart';
+import 'package:wake/services/alarm_scheduler.dart';
+import 'package:wake/services/pending_quiz.dart';
 
 class QuizGateScreen extends StatefulWidget {
   const QuizGateScreen({super.key, required this.alarmId});
@@ -33,18 +35,9 @@ class _QuizGateScreenState extends State<QuizGateScreen> {
       return;
     }
 
-    setState(() => _resolving = true);
-    final result = await AlarmUsecases.resolveQuiz(widget.alarmId);
-    if (!mounted) return;
-    result.fold(
-      (error) {
-        setState(() => _resolving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.userFriendlyErrorMessage)),
-        );
-      },
-      (_) => Navigator.of(context).pop(true),
-    );
+    setState(() => _solving = true);
+    await AlarmScheduler.markQuizSolved(widget.quiz.id);
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -84,8 +77,21 @@ class _QuizGateScreenState extends State<QuizGateScreen> {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed: _resolving ? null : _submit,
-                  child: Text(_resolving ? 'Stopping...' : 'Stop alarm'),
+                  onPressed: _solving ? null : _submit,
+                  child: _solving
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Stop the alarm'),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  // True on both platforms, by different means: Android keeps
+                  // ringing, iOS re-arms.
+                  'The alarm will not stop until this is solved.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),

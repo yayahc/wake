@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wake/features/alarm/cubit/alarm_cubit.dart';
 import 'package:wake/features/alarm/screens/main_screen.dart';
 import 'package:wake/features/quiz/screens/quiz_gate_screen.dart';
-import 'package:wake/services/ios_alarm_channel.dart';
+import 'package:wake/services/alarm_scheduler.dart';
 
 import 'services/ios_alarm_bridge.dart';
 
@@ -83,17 +83,20 @@ class _QuizGate extends StatefulWidget {
 }
 
 class _QuizGateState extends State<_QuizGate> with WidgetsBindingObserver {
+  StreamSubscription<String>? _ringing;
   bool _showing = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _ringing = AlarmScheduler.ringing.listen((_) => unawaited(_check()));
     WidgetsBinding.instance.addPostFrameCallback((_) => _check());
   }
 
   @override
   void dispose() {
+    _ringing?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -104,9 +107,9 @@ class _QuizGateState extends State<_QuizGate> with WidgetsBindingObserver {
   }
 
   Future<void> _check() async {
-    if (_showing || !IosAlarmBridge.isSupported) return;
+    if (_showing || !AlarmScheduler.isSupported) return;
 
-    final quiz = await IosAlarmBridge.pendingQuiz();
+    final quiz = await AlarmScheduler.pendingQuiz();
     if (quiz == null || !mounted) return;
 
     _showing = true;
@@ -118,7 +121,10 @@ class _QuizGateState extends State<_QuizGate> with WidgetsBindingObserver {
     );
     _showing = false;
 
-    if (mounted) unawaited(_check());
+    if (mounted) {
+      context.read<AlarmCubit>().getAlarms();
+      unawaited(_check());
+    }
   }
 
   @override
