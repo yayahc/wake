@@ -1,59 +1,63 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Re-arm alarms after a reboot: AlarmManager forgets them, the store does not. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Keeps the CPU alive while the ring service plays. -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <!-- For apps with targetSDK 31 (Android 12) and newer -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
-   <uses-permission android:name="android.permission.VIBRATE" />
-   <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-   <!-- NOTE: the example app requests USE_EXACT_ALARM to make it easier to run the app.
-        Developers will need to check if their own app needs to use SCHEDULE_EXACT_ALARM instead -->
-   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-   <!-- NOTE: Special use was selected as it's the closest match for this example app.
-        apps should specify the appropriate permission for their use cases. -->
-   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-   <!-- NOTE: This permission isn't needed by the local notification plugin. It is only being
-        requested because the example app will download remote content to demonstrate some scenarios-->
-   <uses-permission android:name="android.permission.INTERNET"/>
-   <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+    <!-- USE_EXACT_ALARM is granted outright to alarm clocks, so no runtime
+         prompt. SCHEDULE_EXACT_ALARM is the fallback for OEM builds that
+         revoke it; WakeAlarmPlugin.openExactAlarmSettings handles that case. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Lets the ring notification take over the lock screen. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+
+    <!-- Closes the Home button escape. Android blocks background activity
+         starts, and this is the exemption that lets the ring service pull the
+         quiz back; a foreground service on its own does not qualify. Must be
+         granted by the user in Settings, so the app prompts for it. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
     <application
         android:label="wake"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!-- Holds the ringtone and wake lock for the whole life of an alarm, so
+             leaving the quiz screen does not stop the sound. -->
         <service
-            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmService"
-            android:permission="android.permission.BIND_JOB_SERVICE"
-            android:exported="false"/>
-        <service
-            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"        
+            android:name=".WakeAlarmService"
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="To demonstrate how to use foreground services to show notifications"/>
+            <!-- Alarms are not one of Android 14's typed categories. This
+                 subtype is what gets declared to Play review. -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="alarm_clock"/>
         </service>
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+
+        <receiver
+            android:name=".WakeAlarmReceiver"
+            android:exported="false"/>
+
+        <receiver
+            android:name=".WakeAlarmBootReceiver"
+            android:exported="false"
+            android:enabled="true">
             <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
-        <receiver
-            android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver"
-            android:exported="false"/>
-        <receiver
-            android:name="dev.fluttercommunity.plus.androidalarmmanager.RebootBroadcastReceiver"
-            android:enabled="false"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -62,6 +66,8 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user

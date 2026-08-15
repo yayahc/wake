@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wake/core/domain/entities/alarm_entity.dart';
 import 'package:wake/core/extensions/context_extension.dart';
 import 'package:wake/features/alarm/cubit/alarm_state.dart';
+import 'package:wake/features/alarm/widgets/permission_banner.dart';
 import 'package:wake/features/alarm/widgets/set_alarm_sheet.dart';
 
 import '../cubit/alarm_cubit.dart';
@@ -18,7 +19,17 @@ class AlarmMainScreen extends StatelessWidget {
         onPressed: () => _setNewAlarm(context),
         child: const Icon(Icons.add_alarm),
       ),
-      body: BlocConsumer<AlarmCubit, AlarmState>(
+      body: Column(
+        children: [
+          const PermissionBanner(),
+          Expanded(child: _buildList(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList(BuildContext context) {
+    return BlocConsumer<AlarmCubit, AlarmState>(
         listenWhen: (_, state) =>
             state is FailedToLoadAlarmsState ||
             state is FailedToDeleteAlarmState,
@@ -44,7 +55,6 @@ class AlarmMainScreen extends StatelessWidget {
             itemBuilder: (context, index) => _AlarmTile(alarm: alarms[index]),
           );
         },
-      ),
     );
   }
 
