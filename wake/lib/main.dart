@@ -5,6 +5,7 @@ import 'init_locla_notification.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await initializeLocalNotification();
   await AlarmScheduler.reconcile();
   await AlarmScheduler.ensureNotificationPermission();
