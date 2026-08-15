@@ -2,7 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:wake/services/ios_alarm_bridge.dart';
+import 'package:wake/services/alarm_scheduler.dart';
+import 'package:wake/services/pending_quiz.dart';
 
 class QuizGateScreen extends StatefulWidget {
   const QuizGateScreen({super.key, required this.quiz});
@@ -43,7 +44,7 @@ class _QuizGateScreenState extends State<QuizGateScreen> {
     }
 
     setState(() => _solving = true);
-    await IosAlarmBridge.markQuizSolved(widget.quiz.id);
+    await AlarmScheduler.markQuizSolved(widget.quiz.id);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -120,7 +121,9 @@ class _QuizGateScreenState extends State<QuizGateScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'The alarm keeps coming back until this is solved.',
+                  // True on both platforms, by different means: Android keeps
+                  // ringing, iOS re-arms.
+                  'The alarm will not stop until this is solved.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall,
                 ),
