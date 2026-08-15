@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ic_stat_wake is only ever named as a string, from Dart, so nothing in the
+    Kotlin or the XML references it. That makes it look unused to resource
+    shrinking, which would strip it from a shrunk release build and produce the
+    same "resource could not be found" failure at runtime.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_wake" />
